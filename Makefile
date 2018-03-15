@@ -1,4 +1,4 @@
-CXX         = docker run -v ${PWD}:/src hare1039/block-go-backend:0.0.8
+CXX         = docker run --rm -v ${PWD}:/src hare1039/block-go-backend:latest
 TARGET	    = app
 OBJECT	    = 
 OBJECT_HTML = 

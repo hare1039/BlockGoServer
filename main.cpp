@@ -3,7 +3,8 @@
 #include <websocketpp/config/asio_no_tls.hpp>
 #include <websocketpp/server.hpp>
 
-typedef websocketpp::server<websocketpp::config::asio> server;
+#include <json.hpp>
+using server = websocketpp::server<websocketpp::config::asio>;
 
 using websocketpp::lib::placeholders::_1;
 using websocketpp::lib::placeholders::_2;
