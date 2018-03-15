@@ -1,5 +1,5 @@
 FROM alpine:3.7
-MAINTAINER hare1039 hare39393@hare1039.nctu.me
+MAINTAINER hare1039 hare1039@hare1039.nctu.me
 
 RUN echo 'http://dl-4.alpinelinux.org/alpine/edge/testing' >> /etc/apk/repositories
 
