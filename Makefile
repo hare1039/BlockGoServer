@@ -8,6 +8,10 @@ CXXFLAGS    =
 all: main.cpp
 	$(CXX) -o $(TARGET) $(CXXFLAGS) $^
 
+.PHONY: debug
+debug: main.cpp
+	$(CXX) -o $(TARGET) $(CXXFLAGS) -g $^
+
 .PHONY: clean
 clean:
 	rm -f $(TARGET) $(OBJECT)
