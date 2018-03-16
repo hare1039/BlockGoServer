@@ -11,42 +11,44 @@
 #include <Poco/Process.h>
 #include <Poco/StreamCopier.h>
 
-std::string run()
-{
-	int rc;
-	try
-	{
-		Poco::Pipe outPipe;
-		Poco::ProcessHandle ph = Poco::Process::launch("echo", std::vector<std::string>{"hi"}, 0, &outPipe, 0);
-		rc = ph.id();
-		Poco::PipeInputStream istr(outPipe);
-
-		std::stringstream ss;
-		Poco::StreamCopier::copyStream(istr, ss);
-		return ss.str();
-	}
-	catch (Poco::SystemException& exc)
-	{
-		std::cout << exc.displayText() << std::endl;
-		return "";		        
-	}
-	return "";
-}
-
-
-
 class game_state
 {
+	Poco::ProcessHandle *handler = nullptr;
+	Poco::Pipe in, out;
+
+	Poco::PipeInputStream  reader;
+	Poco::PipeOutputStream writer;
 public:
-	std::thread th;
-	game_state()
+
+	game_state(): reader(out),
+	              writer(in)
 	{
-		
+		// There are huge template error when I use std::unique_ptr, so I just switch to raw pointer now.
+		handler = new Poco::ProcessHandle{Poco::Process::launch("cat", {"-"}, &in, &out, nullptr)};
+	}
+
+	~game_state()
+	{
+		Poco::Process::kill(*handler);
+		if (handler)
+			delete handler;
 	}
 
 	std::string launch_game_app()
 	{
-		return run();
+		writer << "catting" << std::endl;
+		try
+		{
+			std::string s;
+			reader >> s;
+			return s;
+		}
+		catch (Poco::SystemException& exc)
+		{
+			std::cout << exc.displayText() << std::endl;
+		}
+		return "";
+
 	}
 };
 

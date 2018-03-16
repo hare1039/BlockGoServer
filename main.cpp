@@ -3,7 +3,9 @@
 #include <functional>
 #include <thread>
 #include <vector>
+#include <memory>
 
+// #include <boost/ptr_container/ptr_map.hpp>
 #include <websocketpp/config/asio_no_tls.hpp>
 #include <websocketpp/server.hpp>
 #include <json.hpp>
@@ -18,21 +20,24 @@ using message_ptr = server::message_ptr;
 using json = nlohmann::json;
 
 std::map<websocketpp::connection_hdl,
-         game_state,
+         std::unique_ptr<game_state>,
          std::owner_less<websocketpp::connection_hdl>> game;
+
 void on_message(server* s, websocketpp::connection_hdl hdl, message_ptr msg)
 {
 	std::cout << "on_message called with hdl: " << hdl.lock().get()
 	          << " and message: " << msg->get_payload()
 	          << std::endl;
-	game[hdl] = game_state{};
+
+	game.emplace(hdl, new game_state);
+
 	try
 	{
-		auto command = json::parse(msg->get_payload());		
+		auto command = json::parse(msg->get_payload());
 		std::cout << command.dump(4) << std::endl;
 		try
 		{
-			s->send(hdl, game[hdl].launch_game_app(), msg->get_opcode());
+			s->send(hdl, game[hdl]->launch_game_app(), msg->get_opcode());
 		}
 		catch (const websocketpp::lib::error_code& e)
 		{
@@ -49,6 +54,8 @@ void on_message(server* s, websocketpp::connection_hdl hdl, message_ptr msg)
 
 int main()
 {
+//	std::unique_ptr<game_state> mar{new game_state};
+	game_state s;
 	server echo_server;
 	try
 	{
@@ -56,7 +63,7 @@ int main()
 //		echo_server.set_access_channels(websocketpp::log::alevel::all);
 //		echo_server.clear_access_channels(websocketpp::log::alevel::frame_payload);
 
-		
+
 		echo_server.init_asio();
 		echo_server.set_message_handler(std::bind(&on_message, &echo_server, ::_1, ::_2));
 
