@@ -16,7 +16,8 @@ namespace blockgo
 
 class game_state
 {
-	Poco::ProcessHandle *handler = nullptr;
+//	std::unique_ptr<Poco::ProcessHandle> handler;
+	Poco::ProcessHandle * handler = nullptr;
 	Poco::Pipe in, out;
 
 	Poco::PipeInputStream  reader;
@@ -26,8 +27,8 @@ public:
 	game_state(): reader(out),
 	              writer(in)
 	{
-		// There are huge template error when I use std::unique_ptr, so I just switch to raw pointer now.
-		handler = new Poco::ProcessHandle{Poco::Process::launch("cat", {"-"}, &in, &out, nullptr)};
+		// if I use unique_ptr, Poco::Process will throws segmentation fault. So, old pointers.
+		handler = new Poco::ProcessHandle{Poco::Process::launch("./echo", {}, &in, &out, nullptr)};
 	}
 
 	~game_state()

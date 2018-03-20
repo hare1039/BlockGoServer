@@ -10,7 +10,7 @@
 
 namespace blockgo
 {
-	
+
 class websocket_server
 {
 public:
@@ -33,19 +33,19 @@ private:
 	std::map<websocketpp::connection_hdl,
 	         std::shared_ptr<blockgo::game_state>,
 	         std::owner_less<websocketpp::connection_hdl>> game;
-	
+
 	void on_open(websocketpp::connection_hdl hdl)
 	{
 		game.emplace(hdl, new blockgo::game_state);
 	}
 	void on_fail  (websocketpp::connection_hdl hdl)
 	{
-		std::cout << "connection failed: " << hdl.lock().get() << std::endl; 
+		std::cout << "connection failed: " << hdl.lock().get() << std::endl;
         game.erase(hdl);
 	}
 	void on_close (websocketpp::connection_hdl hdl)
-	{		        
-		std::cout << "Closing connection: " << hdl.lock().get() << std::endl; 
+	{
+		std::cout << "Closing connection: " << hdl.lock().get() << std::endl;
         game.erase(hdl);
 	}
 	void on_message (websocketpp::connection_hdl hdl, decltype(server)::message_ptr msg)
@@ -53,14 +53,13 @@ private:
 		std::cout << "on_message called with hdl: " << hdl.lock().get()
 		          << " and message: " << msg->get_payload()
 		          << std::endl;
-
 		try
 		{
 			auto command = nlohmann::json::parse(msg->get_payload());
 			std::cout << command.dump(4) << std::endl;
 			try
 			{
-				server.send(hdl, game[hdl]->send_stdin("hi"), msg->get_opcode());
+				server.send(hdl, game[hdl]->send_stdin(command["123"]), msg->get_opcode());
 			}
 			catch (const websocketpp::lib::error_code& e)
 			{
@@ -77,10 +76,10 @@ private:
 	std::shared_ptr<blockgo::game_state> get_game_from(websocketpp::connection_hdl hdl)
 	{
 		auto it = game.find(hdl);
-        
+
 		if (it == game.end())
 			throw std::invalid_argument("No data avaliable for session");
-        
+
 		return it->second;
 	}
 };
