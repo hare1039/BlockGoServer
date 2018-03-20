@@ -11,6 +11,9 @@
 #include <Poco/Process.h>
 #include <Poco/StreamCopier.h>
 
+namespace blockgo
+{
+
 class game_state
 {
 	Poco::ProcessHandle *handler = nullptr;
@@ -34,22 +37,22 @@ public:
 			delete handler;
 	}
 
-	std::string launch_game_app()
+	std::string send_stdin(std::string const &s)
 	{
-		writer << "catting" << std::endl;
+		writer << s << std::endl;
 		try
 		{
-			std::string s;
-			reader >> s;
-			return s;
+			std::string result;
+			std::getline(reader, result);
+			return result;
 		}
 		catch (Poco::SystemException& exc)
 		{
 			std::cout << exc.displayText() << std::endl;
 		}
 		return "";
-
 	}
 };
 
+} // namespace blockgo
 #endif //__GAME_STATE_HPP__
