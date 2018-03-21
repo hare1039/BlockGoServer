@@ -1,6 +1,6 @@
 CXX         = docker run --rm -v ${PWD}:/src hare1039/block-go-backend:latest
 TARGET	    = app
-OBJECT	    = echo
+OBJECT	    = 
 DOCKER_ENV  = docker run -it -v ${PWD}:/work --rm -p 9002:9002 alpine
 CXXFLAGS    = 
 
@@ -16,9 +16,6 @@ debug: main.cpp
 clean:
 	rm -f $(TARGET) $(OBJECT)
 
-echo: echo.cpp
-	$(CXX) -o echo $^
-
 .PHONY: run
-run: all echo
+run: all
 	$(DOCKER_ENV) sh -c 'cd /work && ./app'
