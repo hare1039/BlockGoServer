@@ -7,18 +7,19 @@
 |-------------------------------+-----+-------------------------------|
 | {                             |     | {                             |
 | "cmd": "start",               |     | "status": "$S",               |
-| "right": "$P",                | --> | "why": "$STR"                 |
-| "left": "$P"                  |     | }                             |
-| }                             |     |                               |
+| "right": "$P",                | --> | "why": "$STR",                |
+| "left": "$P"                  |     | "cmd": "status"               |
+| }                             |     | }                             |
+|                               |     |                               |
 | ## $P == ["humen", "random",  |     |                               |
 | ##        "strategy", "MCTS"] |     | ## $S == ["ok", "err", "end"] |
 |-------------------------------+-----+-------------------------------|
 | transfering                   |     |                               |
 | {                             |     | {                             |
 | "cmd": "transfer",            |     | "status": "$S",               |
-| "x": $NUMBER,                 | <-> | "why": "$STR"                 |
-| "y": $NUMBER,                 |     | }                             |
-| "stone": $NUMBER,             |     |                               |
+| "x": $NUMBER,                 | <-> | "why": "$STR",                |
+| "y": $NUMBER,                 |     | "cmd": "status"               |
+| "stone": $NUMBER,             |     | }                             |
 | "rotate": $NUMBER             |     |                               |
 | "player": $NUMBER             |     |                               |
 | }                             |     |                               |
