@@ -16,8 +16,7 @@ namespace blockgo
 
 class game_state
 {
-//	std::unique_ptr<Poco::ProcessHandle> handler;
-	Poco::ProcessHandle * handler = nullptr;
+	std::unique_ptr<Poco::ProcessHandle> handler;
 	Poco::Pipe in, out;
 
 	Poco::PipeInputStream  reader;
@@ -27,15 +26,12 @@ public:
 	game_state(): reader(out),
 	              writer(in)
 	{
-		// if I use unique_ptr, Poco::Process will throws segmentation fault. So, old pointers.
-		handler = new Poco::ProcessHandle{Poco::Process::launch("./echo", {}, &in, &out, nullptr)};
+		handler.reset(new Poco::ProcessHandle{Poco::Process::launch("cat", {"-"}, &in, &out, nullptr)});
 	}
 
 	~game_state()
 	{
 		Poco::Process::kill(*handler);
-		if (handler)
-			delete handler;
 	}
 
 	std::string send_stdin(std::string const &s)

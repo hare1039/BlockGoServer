@@ -2,7 +2,9 @@
 #define  __WEBSOCKET_SERVER_HPP__
 
 #include <iostream>
+#include <sstream>
 #include <map>
+#include <algorithm>
 #include <exception>
 #include <websocketpp/config/asio_no_tls.hpp>
 #include <websocketpp/server.hpp>
@@ -10,6 +12,17 @@
 
 namespace blockgo
 {
+
+constexpr
+long long int hash(const char* str, int h = 0)
+{
+	return (!str[h] ? 5381 : (hash(str, h+1)*33) ^ str[h] );
+}
+constexpr
+long long int operator "" _(char const* p, size_t)
+{
+	return hash(p);
+}
 
 class websocket_server
 {
@@ -31,7 +44,7 @@ public:
 private:
 	websocketpp::server<websocketpp::config::asio> server;
 	std::map<websocketpp::connection_hdl,
-	         std::shared_ptr<blockgo::game_state>,
+	         std::unique_ptr<blockgo::game_state>,
 	         std::owner_less<websocketpp::connection_hdl>> game;
 
 	void on_open(websocketpp::connection_hdl hdl)
@@ -50,37 +63,70 @@ private:
 	}
 	void on_message (websocketpp::connection_hdl hdl, decltype(server)::message_ptr msg)
 	{
-		std::cout << "on_message called with hdl: " << hdl.lock().get()
-		          << " and message: " << msg->get_payload()
-		          << std::endl;
 		try
 		{
 			auto command = nlohmann::json::parse(msg->get_payload());
 			std::cout << command.dump(4) << std::endl;
-			try
-			{
-				server.send(hdl, game[hdl]->send_stdin(command["123"]), msg->get_opcode());
-			}
-			catch (const websocketpp::lib::error_code& e)
-			{
-				std::cout << "Echo failed because: " << e
-				          << "(" << e.message() << ")" << std::endl;
-			}
+			server.send(hdl, parse_cmd(hdl, command), msg->get_opcode());
+		}
+		catch (const websocketpp::lib::error_code& e)
+		{
+			std::cerr << "Echo failed because: " << e
+					  << "(" << e.message() << ")" << std::endl;
 		}
 		catch (nlohmann::json::parse_error const &e)
 		{
 			std::cerr << e.what() << std::endl;
-			return;
 		}
 	}
-	std::shared_ptr<blockgo::game_state> get_game_from(websocketpp::connection_hdl hdl)
+
+	std::string parse_cmd(websocketpp::connection_hdl const &hdl, nlohmann::json const & json)
 	{
-		auto it = game.find(hdl);
+		try
+		{
+			switch (hash(json["cmd"].get<std::string>().c_str()))
+			{
+			case "start"_:
+			{
+				if (json["right"] == "humen" && json["left"] == "MCTS")
+					return game[hdl]->send_stdin("4");
+				break;
+			}
 
-		if (it == game.end())
-			throw std::invalid_argument("No data avaliable for session");
+			case "transfer"_:
+			{
+				int x      = json["x"];
+				int y      = json["y"];
+				int type   = json["stone"];
+				int rotate = json["rotate"];
+				std::stringstream command;
 
-		return it->second;
+				// converting json commands to fed into BlockGo
+				command << type;
+				std::fill_n(std::ostream_iterator<char>(command), x, 'd');
+				std::fill_n(std::ostream_iterator<char>(command), y, 's');
+				std::fill_n(std::ostream_iterator<char>(command), 4 - (rotate % 4 /* reverse rotate dir */), 'c');
+				command << 'y';
+
+				return game[hdl]->send_stdin(command.str());
+				break;
+			}
+
+			case "end"_:
+			{
+				break;
+			}
+
+			default:
+				break;
+			}
+		}
+		catch (nlohmann::json::exception const &e)
+		{
+			std::cerr << "message: " << e.what() << '\n'
+			          << "exception id: " << e.id << std::endl;
+		}
+		return "";
 	}
 };
 
