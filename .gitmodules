@@ -1,0 +1,3 @@
+[submodule "ai-project"]
+	path = ai-project
+	url = https://github.com/Chen-wx/AI-Project.git
