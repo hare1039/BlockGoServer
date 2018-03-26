@@ -16,6 +16,7 @@ int main()
 	blockgo::websocket_server game;
 	try
 	{
+		std::cout << "Server started at :9002" << std::endl;
 		game.run(9002);
 	}
 	catch (websocketpp::exception const & e)
