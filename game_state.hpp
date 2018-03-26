@@ -26,7 +26,7 @@ public:
 	game_state(): reader(out),
 	              writer(in)
 	{
-		handler.reset(new Poco::ProcessHandle{Poco::Process::launch("cat", {"-"}, &in, &out, nullptr)});
+		handler.reset(new Poco::ProcessHandle{Poco::Process::launch("ai-project/BlockGo/BlockGoStatic", {"web"}, &in, &out, nullptr)});
 	}
 
 	~game_state()
@@ -34,14 +34,18 @@ public:
 		Poco::Process::kill(*handler);
 	}
 
-	std::string send_stdin(std::string const &s)
+	std::string send_stdin(std::string const &s, bool expect_return = true)
 	{
+		std::cout << s << " sent\n";
 		writer << s << std::endl;
 		try
 		{
-			std::string result;
-			std::getline(reader, result);
-			return result;
+			if (expect_return)
+			{
+				std::string result;
+				std::getline(reader, result);
+				return result;
+			}
 		}
 		catch (Poco::SystemException& exc)
 		{

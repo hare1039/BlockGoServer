@@ -66,10 +66,9 @@ private:
 		try
 		{
 			auto command = nlohmann::json::parse(msg->get_payload());
-			std::cout << command.dump(4) << std::endl;
 			server.send(hdl, parse_cmd(hdl, command), msg->get_opcode());
 		}
-		catch (const websocketpp::lib::error_code& e)
+		catch (websocketpp::lib::error_code const &e)
 		{
 			std::cerr << "Echo failed because: " << e
 					  << "(" << e.message() << ")" << std::endl;
@@ -82,15 +81,26 @@ private:
 
 	std::string parse_cmd(websocketpp::connection_hdl const &hdl, nlohmann::json const & json)
 	{
+		std::cout << json.dump(4) << std::endl;
 		try
 		{
 			switch (hash(json["cmd"].get<std::string>().c_str()))
 			{
 			case "start"_:
 			{
-				if (json["right"] == "humen" && json["left"] == "MCTS")
-					return game[hdl]->send_stdin("4");
-				break;
+				if (json["left"] == "MCTS" && json["right"] == "human")
+				{
+					game[hdl]->send_stdin("4");
+				}
+				else if (json["left"] == "human" && json["right"] == "MCTS")
+				{
+					game[hdl]->send_stdin("3", /* expect return */false);
+				}
+				return (nlohmann::json{
+					{"cmd", "status"},
+					{"status", "ok"},
+					{"why", ""}
+				}).dump();
 			}
 
 			case "transfer"_:
@@ -105,11 +115,29 @@ private:
 				command << type;
 				std::fill_n(std::ostream_iterator<char>(command), x, 'd');
 				std::fill_n(std::ostream_iterator<char>(command), y, 's');
-				std::fill_n(std::ostream_iterator<char>(command), 4 - (rotate % 4 /* reverse rotate dir */), 'c');
+				std::fill_n(std::ostream_iterator<char>(command), rotate, 'c');
 				command << 'y';
 
-				return game[hdl]->send_stdin(command.str());
-				break;
+				try
+				{
+					auto res = nlohmann::json::parse(game[hdl]->send_stdin(command.str()));
+					res["cmd"] = "transfer";
+					return res.dump();
+				}
+				catch (nlohmann::json::parse_error const &e)
+				{
+					std::cerr << e.what() << std::endl;
+					return R"json({
+                        "cmd": "status", 
+                        "status": "err", 
+                        "why": "unable to parse returned json"
+                    })json";
+				}
+                return R"json({                                                       
+                    "cmd": "status",                                                  
+                    "status": "err",                                                  
+                    "why": "unexpected exception happened"                            
+                })json";
 			}
 
 			case "end"_:
@@ -118,7 +146,8 @@ private:
 			}
 
 			default:
-				break;
+				std::cerr << "[parse cmd] AAAAAAh no one gets here!\n";
+				break;			
 			}
 		}
 		catch (nlohmann::json::exception const &e)
