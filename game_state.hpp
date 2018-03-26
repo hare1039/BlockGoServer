@@ -36,7 +36,7 @@ public:
 
 	std::string send_stdin(std::string const &s, bool expect_return = true)
 	{
-		std::cout << s << " sent\n";
+		BOOST_LOG_TRIVIAL(debug) << s << " sent\n";
 		writer << s << std::endl;
 		try
 		{
@@ -44,12 +44,13 @@ public:
 			{
 				std::string result;
 				std::getline(reader, result);
+				reader.clear();
 				return result;
 			}
 		}
 		catch (Poco::SystemException& exc)
 		{
-			std::cout << exc.displayText() << std::endl;
+			BOOST_LOG_TRIVIAL(error) << exc.displayText() << std::endl;
 		}
 		return "";
 	}

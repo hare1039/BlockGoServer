@@ -5,6 +5,8 @@
 #include <vector>
 #include <memory>
 
+#include <boost/log/trivial.hpp>
+
 #include <websocketpp/config/asio_no_tls.hpp>
 #include <websocketpp/server.hpp>
 #include <json.hpp>
@@ -16,15 +18,16 @@ int main()
 	blockgo::websocket_server game;
 	try
 	{
-		std::cout << "Server started at :9002" << std::endl;
+		BOOST_LOG_TRIVIAL(info) << "Server started at :9002" << std::endl;
 		game.run(9002);
 	}
 	catch (websocketpp::exception const & e)
 	{
-		std::cout << e.what() << std::endl;
+		BOOST_LOG_TRIVIAL(error) << e.what() << std::endl;
 	}
 	catch (...)
 	{
-		std::cout << "other exception" << std::endl;
+		BOOST_LOG_TRIVIAL(error) << "other exception" << std::endl;
 	}
+	return 0;
 }

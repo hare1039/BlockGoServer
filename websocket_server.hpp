@@ -8,7 +8,9 @@
 #include <exception>
 #include <websocketpp/config/asio_no_tls.hpp>
 #include <websocketpp/server.hpp>
+#include <boost/log/trivial.hpp>
 #include "game_state.hpp"
+
 
 namespace blockgo
 {
@@ -53,12 +55,12 @@ private:
 	}
 	void on_fail  (websocketpp::connection_hdl hdl)
 	{
-		std::cout << "connection failed: " << hdl.lock().get() << std::endl;
+		BOOST_LOG_TRIVIAL(error) << "connection failed: " << hdl.lock().get() << std::endl;
         game.erase(hdl);
 	}
 	void on_close (websocketpp::connection_hdl hdl)
 	{
-		std::cout << "Closing connection: " << hdl.lock().get() << std::endl;
+		BOOST_LOG_TRIVIAL(info) << "Closing connection: " << hdl.lock().get() << std::endl;
         game.erase(hdl);
 	}
 	void on_message (websocketpp::connection_hdl hdl, decltype(server)::message_ptr msg)
@@ -70,18 +72,18 @@ private:
 		}
 		catch (websocketpp::lib::error_code const &e)
 		{
-			std::cerr << "Echo failed because: " << e
-					  << "(" << e.message() << ")" << std::endl;
+			BOOST_LOG_TRIVIAL(error) << "Echo failed because: " << e
+			                         << "(" << e.message() << ")" << std::endl;
 		}
 		catch (nlohmann::json::parse_error const &e)
 		{
-			std::cerr << e.what() << std::endl;
+			BOOST_LOG_TRIVIAL(error) << e.what() << std::endl;
 		}
 	}
 
 	std::string parse_cmd(websocketpp::connection_hdl const &hdl, nlohmann::json const & json)
 	{
-		std::cout << json.dump(4) << std::endl;
+		BOOST_LOG_TRIVIAL(debug) << json.dump(4) << std::endl;
 		try
 		{
 			switch (hash(json["cmd"].get<std::string>().c_str()))
@@ -126,7 +128,7 @@ private:
 				}
 				catch (nlohmann::json::parse_error const &e)
 				{
-					std::cerr << e.what() << std::endl;
+					BOOST_LOG_TRIVIAL(error) << e.what() << std::endl;
 					return R"json({
                         "cmd": "status", 
                         "status": "err", 
@@ -146,7 +148,7 @@ private:
 			}
 
 			default:
-				std::cerr << "[parse cmd] AAAAAAh no one gets here!\n";
+				BOOST_LOG_TRIVIAL(error) << "[parse cmd] AAAAAAh no one gets here!\n";
 				break;			
 			}
 		}

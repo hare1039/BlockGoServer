@@ -20,7 +20,11 @@ RUN cat /usr/include/sys/poll.h | grep -v warning > /usr/include/sys/poll.hh &&\
 	mv /usr/include/sys/poll.h /usr/include/sys/poll.h.old &&\
 	mv /usr/include/sys/poll.hh /usr/include/sys/poll.h
 
-RUN echo 'cd /src && clang++ "$@" -I/header -lpthread -lboost_system -static -lPocoFoundation -lPocoNet -std=c++14' > /run.sh &&\
+RUN wget https://github.com/gabime/spdlog/archive/v0.16.3.zip &&\
+    unzip v0.16.3.zip &&\
+    mv spdlog-0.16.3/include/spdlog /header
+
+RUN echo 'cd /src && clang++ -static -std=c++14 "$@" -I/header -pthread -lboost_log_setup-mt -lboost_log-mt -lboost_thread-mt -lboost_system-mt -lPocoFoundation -lPocoNet' > /run.sh &&\
 	chmod +x /run.sh
 
 ENTRYPOINT ["sh", "/run.sh"]
