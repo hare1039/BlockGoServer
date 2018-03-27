@@ -36,15 +36,22 @@ public:
 
 	std::string send_stdin(std::string const &s, bool expect_return = true)
 	{
-		BOOST_LOG_TRIVIAL(debug) << s << " sent\n";
+		BOOST_LOG_TRIVIAL(info) << "sending: " << s;
 		writer << s << std::endl;
+		BOOST_LOG_TRIVIAL(debug) << "sent: " << s;
 		try
 		{
 			if (expect_return)
 			{
 				std::string result;
-				std::getline(reader, result);
+				while (reader.peek() != '\n')
+				{
+					result += reader.get();
+					BOOST_LOG_TRIVIAL(trace) << "reader in_avail: " << result;
+				}
+				reader.get();
 				reader.clear();
+				BOOST_LOG_TRIVIAL(trace) << "line getted " << result;
 				return result;
 			}
 		}

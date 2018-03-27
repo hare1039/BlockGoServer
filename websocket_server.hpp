@@ -124,6 +124,8 @@ private:
 				{
 					auto res = nlohmann::json::parse(game[hdl]->send_stdin(command.str()));
 					res["cmd"] = "transfer";
+					res["x"] = res["x"].get<int>() - 1;
+					res["y"] = res["y"].get<int>() - 1;
 					return res.dump();
 				}
 				catch (nlohmann::json::parse_error const &e)

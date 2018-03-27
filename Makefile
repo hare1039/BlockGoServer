@@ -3,7 +3,7 @@ TARGET	    = app
 OBJECT	    = 
 DOCKER_ENV  = docker run -it -v ${PWD}:/work --rm -p 9002:9002 alpine
 DOCKER_MAKE = docker run --rm -v ${PWD}:/work hare1039/alpinemake
-CXXFLAGS    = 
+CXXFLAGS    = -g
 
 
 all: main.cpp
