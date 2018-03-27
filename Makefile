@@ -6,21 +6,21 @@ DOCKER_MAKE = docker run --rm -v ${PWD}:/work hare1039/alpinemake
 CXXFLAGS    = -g
 
 
-all: main.cpp
+app: main.cpp
 	$(CXX) -o $(TARGET) $(CXXFLAGS) $^
 
 .PHONY: debug
 debug: main.cpp
 	$(CXX) -o $(TARGET) $(CXXFLAGS) -g $^
 
-.PHONY: clean
-clean:
-	rm -f $(TARGET) $(OBJECT)
-
 .PHONY: main
 main:
 	$(DOCKER_MAKE) sh -c 'cd /work/ai-project/BlockGo && make BlockGoStatic;'
 
 .PHONY: run
-run: all main
+run: app main
 	$(DOCKER_ENV) sh -c 'cd /work && ./app'
+
+.PHONY: clean
+clean:
+	rm -f $(TARGET) $(OBJECT)
