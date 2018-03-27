@@ -5,29 +5,29 @@
 #include <vector>
 #include <memory>
 
-#include <boost/log/trivial.hpp>
+#include <spdlog/spdlog.h>
 
 #include <websocketpp/config/asio_no_tls.hpp>
 #include <websocketpp/server.hpp>
 #include <json.hpp>
 
-#include "game_state.hpp"
 #include "websocket_server.hpp"
-int main()
+int main(int argc, char *argv[])
 {
+	spdlog::stdout_color_mt("main");
 	blockgo::websocket_server game;
 	try
 	{
-		BOOST_LOG_TRIVIAL(info) << "Server started at :9002" << std::endl;
+		spdlog::get("main")->info("Server started at :9002");
 		game.run(9002);
 	}
 	catch (websocketpp::exception const & e)
 	{
-		BOOST_LOG_TRIVIAL(error) << e.what() << std::endl;
+		spdlog::get("main")->critical("{}", e.what());
 	}
 	catch (...)
 	{
-		BOOST_LOG_TRIVIAL(error) << "other exception" << std::endl;
+		spdlog::get("main")->critical("other exception");
 	}
 	return 0;
 }

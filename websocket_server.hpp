@@ -8,7 +8,7 @@
 #include <exception>
 #include <websocketpp/config/asio_no_tls.hpp>
 #include <websocketpp/server.hpp>
-#include <boost/log/trivial.hpp>
+#include <spdlog/spdlog.h>
 #include "game_state.hpp"
 
 
@@ -31,6 +31,7 @@ class websocket_server
 public:
 	websocket_server()
 	{
+		spdlog::stdout_color_mt("websocket");
 		server.init_asio();
 		server.set_message_handler ([this](websocketpp::connection_hdl hdl, decltype(server)::message_ptr msg){this->on_message(hdl, msg);});
 		server.set_open_handler    ([this](websocketpp::connection_hdl hdl){this->on_open(hdl);});
@@ -55,12 +56,12 @@ private:
 	}
 	void on_fail  (websocketpp::connection_hdl hdl)
 	{
-		BOOST_LOG_TRIVIAL(error) << "connection failed: " << hdl.lock().get() << std::endl;
+		spdlog::get("websocket")->error("Connection failed: {}", hdl.lock().get());
         game.erase(hdl);
 	}
 	void on_close (websocketpp::connection_hdl hdl)
 	{
-		BOOST_LOG_TRIVIAL(info) << "Closing connection: " << hdl.lock().get() << std::endl;
+		spdlog::get("websocket")->info("Closing connection: {}", hdl.lock().get());
         game.erase(hdl);
 	}
 	void on_message (websocketpp::connection_hdl hdl, decltype(server)::message_ptr msg)
@@ -72,18 +73,17 @@ private:
 		}
 		catch (websocketpp::lib::error_code const &e)
 		{
-			BOOST_LOG_TRIVIAL(error) << "Echo failed because: " << e
-			                         << "(" << e.message() << ")" << std::endl;
+			spdlog::get("websocket")->error("on message failed because: {}", e.message());
 		}
 		catch (nlohmann::json::parse_error const &e)
 		{
-			BOOST_LOG_TRIVIAL(error) << e.what() << std::endl;
+			spdlog::get("websocket")->error("on message failed because: {}", e.what());
 		}
 	}
 
 	std::string parse_cmd(websocketpp::connection_hdl const &hdl, nlohmann::json const & json)
 	{
-		BOOST_LOG_TRIVIAL(debug) << json.dump(4) << std::endl;
+		spdlog::get("websocket")->info("{}", json.dump(4));
 		try
 		{
 			switch (hash(json["cmd"].get<std::string>().c_str()))
@@ -92,11 +92,11 @@ private:
 			{
 				if (json["left"] == "MCTS" && json["right"] == "human")
 				{
-					game[hdl]->send_stdin("4");
+					return game[hdl]->send_stdin("4");
 				}
 				else if (json["left"] == "human" && json["right"] == "MCTS")
 				{
-					game[hdl]->send_stdin("3", /* expect return */false);
+					game[hdl]->send_stdin("3", /* expect return */ false);
 				}
 				return (nlohmann::json{
 					{"cmd", "status"},
@@ -130,17 +130,17 @@ private:
 				}
 				catch (nlohmann::json::parse_error const &e)
 				{
-					BOOST_LOG_TRIVIAL(error) << e.what() << std::endl;
+					spdlog::get("websocket")->error("process output json failed because: {}", e.what());
 					return R"json({
-                        "cmd": "status", 
-                        "status": "err", 
+                        "cmd": "status",
+                        "status": "err",
                         "why": "unable to parse returned json"
                     })json";
 				}
-                return R"json({                                                       
-                    "cmd": "status",                                                  
-                    "status": "err",                                                  
-                    "why": "unexpected exception happened"                            
+                return R"json({
+                    "cmd": "status",
+                    "status": "err",
+                    "why": "unexpected exception happened"
                 })json";
 			}
 
@@ -150,14 +150,13 @@ private:
 			}
 
 			default:
-				BOOST_LOG_TRIVIAL(error) << "[parse cmd] AAAAAAh no one gets here!\n";
-				break;			
+				spdlog::get("websocket")->error("[parse cmd] AAAAAAh no one gets here!\n");
+				break;
 			}
 		}
 		catch (nlohmann::json::exception const &e)
 		{
-			std::cerr << "message: " << e.what() << '\n'
-			          << "exception id: " << e.id << std::endl;
+			spdlog::get("websocket")->error("json.cmd parse failed. What: {} \ne-id: {2} \n", e.what(), e.id);
 		}
 		return "";
 	}

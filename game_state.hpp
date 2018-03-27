@@ -6,58 +6,56 @@
 #include <iostream>
 #include <sstream>
 
-#include <Poco/PipeStream.h>
-#include <Poco/Pipe.h>
-#include <Poco/Process.h>
-#include <Poco/StreamCopier.h>
+#include <spdlog/spdlog.h>
+#include <boost/process.hpp>
 
 namespace blockgo
 {
 
+namespace bp = boost::process;
 class game_state
 {
-	std::unique_ptr<Poco::ProcessHandle> handler;
-	Poco::Pipe in, out;
+	std::unique_ptr<bp::child> handler;
 
-	Poco::PipeInputStream  reader;
-	Poco::PipeOutputStream writer;
+	bp::ipstream reader;
+	bp::opstream writer;
 public:
 
-	game_state(): reader(out),
-	              writer(in)
+	game_state()
 	{
-		handler.reset(new Poco::ProcessHandle{Poco::Process::launch("ai-project/BlockGo/BlockGoStatic", {"web"}, &in, &out, nullptr)});
+		spdlog::stdout_color_mt("game_state");
+		handler.reset(
+			new bp::child{"ai-project/BlockGo/BlockGoStatic", "web",
+					       bp::std_out > reader,
+       	                   bp::std_in  < writer,
+	                       bp::std_err > bp::null
+	    });
 	}
 
 	~game_state()
 	{
-		Poco::Process::kill(*handler);
+		handler->terminate();
 	}
 
 	std::string send_stdin(std::string const &s, bool expect_return = true)
 	{
-		BOOST_LOG_TRIVIAL(info) << "sending: " << s;
+		spdlog::get("game_state")->info("sending: {}", s);
 		writer << s << std::endl;
-		BOOST_LOG_TRIVIAL(debug) << "sent: " << s;
+		spdlog::get("game_state")->info("sent: {}", s);
 		try
 		{
 			if (expect_return)
 			{
 				std::string result;
-				while (reader.peek() != '\n')
-				{
-					result += reader.get();
-					BOOST_LOG_TRIVIAL(trace) << "reader in_avail: " << result;
-				}
-				reader.get();
+				std::getline(reader, result);
 				reader.clear();
-				BOOST_LOG_TRIVIAL(trace) << "line getted " << result;
+				spdlog::get("game_state")->info("sent: {}", result);
 				return result;
 			}
 		}
-		catch (Poco::SystemException& exc)
+		catch (std::system_error const & exc)
 		{
-			BOOST_LOG_TRIVIAL(error) << exc.displayText() << std::endl;
+			spdlog::get("game_state")->error("std::system_error: {}", exc.what());
 		}
 		return "";
 	}
