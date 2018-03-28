@@ -123,9 +123,10 @@ private:
 				try
 				{
 					auto res = nlohmann::json::parse(game[hdl]->send_stdin(command.str()));
-					res["cmd"] = "transfer";
-					res["x"] = res["x"].get<int>() - 1;
-					res["y"] = res["y"].get<int>() - 1;
+					res["cmd"]    = "transfer";
+					res["x"]      = res["x"].get<int>() - 1;
+					res["y"]      = res["y"].get<int>() - 1;
+					res["rotate"] = 4 - (res["rotate"].get<int>() % 4);
 					return res.dump();
 				}
 				catch (nlohmann::json::parse_error const &e)
@@ -151,7 +152,10 @@ private:
 
 			case "debug"_:
 			{
-				return game[hdl]->send_stdin(json["data"]);
+				bool out = true;
+				if (json.count("noout") > 0)
+					out = false;
+				return game[hdl]->send_stdin(json["data"], out);
 				break;
 			}
 

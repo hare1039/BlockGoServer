@@ -28,7 +28,7 @@ public:
 			new bp::child{"./ai-project/BlockGo/BlockGoStatic", "web",
 					       bp::std_out > reader,
        	                   bp::std_in  < writer,
-	                       bp::std_err > bp::null
+	                       bp::std_err > stderr
 	    });
 	}
 
