@@ -149,6 +149,12 @@ private:
 				break;
 			}
 
+			case "debug"_:
+			{
+				return game[hdl]->send_stdin(json["data"]);
+				break;
+			}
+
 			default:
 				spdlog::get("websocket")->error("[parse cmd] AAAAAAh no one gets here!\n");
 				break;

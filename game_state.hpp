@@ -25,7 +25,7 @@ public:
 	{
 		spdlog::stdout_color_mt("game_state");
 		handler.reset(
-			new bp::child{"ai-project/BlockGo/BlockGoStatic", "web",
+			new bp::child{"./ai-project/BlockGo/BlockGoStatic", "web",
 					       bp::std_out > reader,
        	                   bp::std_in  < writer,
 	                       bp::std_err > bp::null
@@ -46,10 +46,11 @@ public:
 		{
 			if (expect_return)
 			{
+				spdlog::get("game_state")->info("expecting output...");
 				std::string result;
 				std::getline(reader, result);
 				reader.clear();
-				spdlog::get("game_state")->info("sent: {}", result);
+				spdlog::get("game_state")->info("output get: {}", result);
 				return result;
 			}
 		}
