@@ -54,7 +54,7 @@ private:
 	         std::unique_ptr<std::thread>,
 	         std::owner_less<websocketpp::connection_hdl>> thread_pool;
 
-	void on_open(websocketpp::connection_hdl hdl)
+	void on_open  (websocketpp::connection_hdl hdl)
 	{
 		spdlog::get("websocket")->info("Opening connection: {}", hdl.lock().get());
 		auto io = std::make_unique<boost::asio::io_service>();
@@ -69,6 +69,7 @@ private:
         game.erase(hdl);
         spdlog::get("websocket")->error("joining thread: {}", hdl.lock().get());
         thread_pool[hdl]->join();
+        thread_pool.erase(hdl);
 	}
 	void on_close (websocketpp::connection_hdl hdl)
 	{
@@ -76,6 +77,7 @@ private:
         game.erase(hdl);
         spdlog::get("websocket")->trace("joining thread: {}", hdl.lock().get());
         thread_pool[hdl]->join();
+        thread_pool.erase(hdl);
 	}
 	void on_message (websocketpp::connection_hdl hdl, decltype(server)::message_ptr msg)
 	{
@@ -94,13 +96,44 @@ private:
 		}
 	}
 
-	void send_string(websocketpp::connection_hdl const &hdl, std::string s) override
+	void send(websocketpp::connection_hdl const &hdl, std::string s) override
 	{
-		spdlog::get("websocket")->trace("sending: {}, [", s);
-		for (auto &p : thread_pool)
-			spdlog::get("websocket")->trace("  {},", p.first.lock().get());
-		spdlog::get("websocket")->trace("] should contain {}", hdl.lock().get());
-		server.send(hdl, s, websocketpp::frame::opcode::text);
+		spdlog::get("websocket")->trace("sending by hdl: {}", s);
+		if (s == "")
+		{
+			server.send(hdl, (nlohmann::json{
+				{"cmd", "status"},
+				{"status", "ok"},
+				{"why", ""}
+			}).dump(), websocketpp::frame::opcode::text);
+		}
+		try
+		{
+			auto res = nlohmann::json::parse(s);
+			res["cmd"]    = "transfer";
+			res["x"]      = res["x"].get<int>() - 1;
+			res["y"]      = res["y"].get<int>() - 1;
+			res["rotate"] = 4 - (res["rotate"].get<int>() % 4);
+			server.send(hdl, res.dump(), websocketpp::frame::opcode::text);
+		}
+		catch (nlohmann::json::parse_error const &e)
+		{
+			spdlog::get("websocket")->error("process output json failed because: {}", e.what());
+			server.send(hdl, (nlohmann::json{
+				{"cmd", "status"},
+				{"status", "err"},
+				{"why", "unable to parse returned json"}
+			}).dump(), websocketpp::frame::opcode::text);
+		}
+		catch (nlohmann::json::exception const &e)
+		{
+			spdlog::get("websocket")->error("json error: {}", e.what());
+            server.send(hdl, (nlohmann::json{
+                {"cmd", "status"},
+                {"status", "err"},
+                {"why", "unknown json error"}
+            }).dump(), websocketpp::frame::opcode::text);
+		}
 		spdlog::get("websocket")->trace("sent: {}", s);
 	}
 
@@ -121,17 +154,37 @@ private:
 				{
 					blockgo.send_stdin("3");
 				}
-//				return (nlohmann::json{
-//					{"cmd", "status"},
-//					{"status", "ok"},
-//					{"why", ""}
-//				}).dump();
-			}
-			case "debug"_:
-			{
-				blockgo.send_stdin(json["data"]);
 				break;
 			}
+			case "transfer"_:
+			{
+				int x      = json["x"];
+				int y      = json["y"];
+				int type   = json["stone"];
+				int rotate = json["rotate"];
+				std::stringstream command;
+
+				// converting json commands to fed into BlockGo
+				command << type;
+				std::fill_n(std::ostream_iterator<char>(command), x, 'd');
+				std::fill_n(std::ostream_iterator<char>(command), y, 's');
+				std::fill_n(std::ostream_iterator<char>(command), rotate, 'c');
+				command << 'y';
+
+				blockgo.send_stdin(command.str());
+				break;
+			}
+
+			case "end"_:
+				break;
+
+			case "debug"_:
+				blockgo.send_stdin(json["data"]);
+				break;
+
+			default:
+				spdlog::get("websocket")->error("[parse cmd] AAAhhh... no one gets here!\n");
+				break;
 			}
 		}
 		catch (nlohmann::json::exception const &e)
@@ -141,72 +194,5 @@ private:
 	}
 };
 
-
-//		std::string parse_cmd(websocketpp::connection_hdl const &hdl, nlohmann::json const & json)
-//	{
-//
-//		try
-//		{
-//
-//			{
-//
-//
-//			case "transfer"_:
-//			{
-//				int x      = json["x"];
-//				int y      = json["y"];
-//				int type   = json["stone"];
-//				int rotate = json["rotate"];
-//				std::stringstream command;
-//
-//				// converting json commands to fed into BlockGo
-//				command << type;
-//				std::fill_n(std::ostream_iterator<char>(command), x, 'd');
-//				std::fill_n(std::ostream_iterator<char>(command), y, 's');
-//				std::fill_n(std::ostream_iterator<char>(command), rotate, 'c');
-//				command << 'y';
-//
-//				try
-//				{
-//					auto res = nlohmann::json::parse(blockgo[hdl]->send_stdin(command.str()));
-//					res["cmd"]    = "transfer";
-//					res["x"]      = res["x"].get<int>() - 1;
-//					res["y"]      = res["y"].get<int>() - 1;
-//					res["rotate"] = 4 - (res["rotate"].get<int>() % 4);
-//					return res.dump();
-//				}
-//				catch (nlohmann::json::parse_error const &e)
-//				{
-//					spdlog::get("websocket")->error("process output json failed because: {}", e.what());
-//					return R"json({
-//                        "cmd": "status",
-//                        "status": "err",
-//                        "why": "unable to parse returned json"
-//                    })json";
-//				}
-//                return R"json({
-//                    "cmd": "status",
-//                    "status": "err",
-//                    "why": "unexpected exception happened"
-//                })json";
-//			}
-//
-//			case "end"_:
-//			{
-//				break;
-//			}
-//
-//
-//			default:
-//				spdlog::get("websocket")->error("[parse cmd] AAAAAAh no one gets here!\n");
-//				break;
-//			}
-//		}
-//		catch (nlohmann::json::exception const &e)
-//		{
-//			spdlog::get("websocket")->error("json.cmd parse failed. What: {} \ne-id: {2} \n", e.what(), e.id);
-//		}
-//		return "";
-//	}
 }// namespace blockgo
 #endif //__WEBSOCKET_SERVER_HPP__

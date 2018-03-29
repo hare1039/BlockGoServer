@@ -15,13 +15,13 @@
 namespace blockgo
 {
 
-	
+
 namespace bp = boost::process;
 class websocket_server_base
 {
 public:
 	virtual ~websocket_server_base() {}
-	virtual void send_string(websocketpp::connection_hdl const &, std::string) = 0;
+	virtual void send(websocketpp::connection_hdl const &, std::string) = 0;
 };
 
 class game_ctrl
@@ -39,7 +39,9 @@ public:
 	          websocketpp::connection_hdl h,
 	          boost::asio::io_service & io): ws(wsp), hdl(h), ipipe(io), opipe(io)
 	{
-		spdlog::stdout_color_mt("game_ctrl");
+		if (not spdlog::get("game_ctrl") /* found */)
+			spdlog::stdout_color_mt("game_ctrl");
+
 		spdlog::get("game_ctrl")->trace("hdl: {}", hdl.lock().get());
 		handler.reset(
 			new bp::child{"./ai-project/BlockGo/BlockGoStatic", "web",
@@ -56,7 +58,7 @@ public:
 	{
 		spdlog::get("game_ctrl")->trace("deconstructing");
 		handler->terminate();
-	}	
+	}
 
 	void send_stdin(std::string const &s)
 	{
@@ -87,7 +89,7 @@ private:
 					std::getline(is, line);
 					spdlog::get("game_ctrl")->debug("async read pipe and send: {}", line);
 					spdlog::get("game_ctrl")->trace("hdl: {}", hdl.lock().get());
-					ws.send_string(hdl, line);
+					ws.send(hdl, line);
 					launch_read_pipe();
 				}
 				else
@@ -107,6 +109,7 @@ private:
 			{
 				if (not error)
 				{
+					spdlog::get("game_ctrl")->debug("wrote pipe: {}", write_msg_queue.front());
 					write_msg_queue.pop();
 					if (not write_msg_queue.empty())
 						launch_write_pipe();
