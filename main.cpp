@@ -15,7 +15,8 @@
 int main(int argc, char *argv[])
 {
 	spdlog::stdout_color_mt("main");
-	spdlog::set_pattern("[%Y-%m-%d %H:%M:%S] [%n] [%l] %v");
+	spdlog::set_pattern("[%Y-%m-%d %H:%M:%S] [%n] [%t] [%l] %v");
+	spdlog::set_level(spdlog::level::trace);
 	blockgo::websocket_server game;
 	try
 	{
@@ -26,9 +27,9 @@ int main(int argc, char *argv[])
 	{
 		spdlog::get("main")->critical("{}", e.what());
 	}
-	catch (...)
+	catch (std::exception const & e)
 	{
-		spdlog::get("main")->critical("other exception");
+		spdlog::get("main")->critical("other exception: {}", e.what());
 	}
 	return 0;
 }
