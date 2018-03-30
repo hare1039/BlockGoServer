@@ -3,33 +3,32 @@
 * Protocal
 << All transfer in json >>
 ** Start
-| client                        |     | server                        |
-|-------------------------------+-----+-------------------------------|
-| {                             |     | {                             |
-| "cmd": "start",               |     | "status": "$S",               |
-| "right": "$P",                | --> | "why": "$STR",                |
-| "left": "$P"                  |     | "cmd": "status"               |
-| }                             |     | }                             |
-|                               |     |                               |
-| ## $P == ["human", "random",  |     |                               |
-| ##        "strategy", "MCTS"] |     | ## $S == ["ok", "err", "end"] |
-|-------------------------------+-----+-------------------------------|
-| transfering                   |     |                               |
-| {                             |     | {                             |
-| "cmd": "transfer",            |     | "status": "$S",               |
-| "x": $NUMBER,                 | <-> | "why": "$STR",                |
-| "y": $NUMBER,                 |     | "cmd": "status"               |
-| "stone": $NUMBER,             |     | }                             |
-| "rotate": $NUMBER             |     |                               |
-| "player": $NUMBER             |     |                               |
-| }                             |     |                               |
-|-------------------------------+-----+-------------------------------|
-| Ending                        |     |                               |
-| {                             | <-- | {                             |
-| "cmd": "ok",                  |     | "status": "end",              |
-| "why":"$STR"                  |     | "why": "winner is xxx",       |
-| }                             |     | "cmd": "status"               |
-|                               |     | }                             |
-|                               | --> | connection close              |
-|-------------------------------+-----+-------------------------------|
+| client                        |     | server                           |
+|-------------------------------+-----+----------------------------------|
+| {                             |     | {                                |
+| "cmd": "start",               |     | "status": "$S",                  |
+| "right": "$P",                | --> | "why": "$STR",                   |
+| "left": "$P"                  |     | "cmd": "status"                  |
+| }                             |     | }                                |
+|                               |     |                                  |
+| ## $P == ["human", "random",  |     |                                  |
+| ##        "strategy", "MCTS"] |     | ## $S == ["ok", "err", "end"]    |
+|-------------------------------+-----+----------------------------------|
+| transfering                   |     | {                                |
+| {                             |     | "status": "$S",                  |
+| "cmd": "transfer",            |     | "why": "$STR",                   |
+| "x": $NUMBER,                 | <-> | "cmd": "status"                  |
+| "y": $NUMBER,                 |     | }                                |
+| "stone": $NUMBER,             |     | ## if why is err                 |
+| "rotate": $NUMBER             |     | "origin"?: {x, y, stone, rotate} |
+| }                             |     |                                  |
+|-------------------------------+-----+----------------------------------|
+| Ending                        |     |                                  |
+| {                             | <-- | {                                |
+| "cmd": "ok",                  |     | "status": "end",                 |
+| "why":"$STR"                  |     | "why": "winner is xxx",          |
+| }                             |     | "cmd": "status"                  |
+|                               |     | }                                |
+|                               | --> | connection close                 |
+|-------------------------------+-----+----------------------------------|
 
