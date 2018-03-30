@@ -48,8 +48,8 @@ public:
 			new bp::child{"./ai-project/BlockGo/BlockGoStatic", "web",
 					       bp::std_out > ipipe,
        	                   bp::std_in  < opipe,
-//	                       bp::std_err > bp::null
-	                       bp::std_err > stderr
+	                       bp::std_err > bp::null
+//	                       bp::std_err > stderr
 	    });
 		launch_read_pipe();
 	}
