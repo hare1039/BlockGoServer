@@ -12,11 +12,11 @@
 #include <json.hpp>
 
 #include "websocket_server.hpp"
-int main(int argc, char *argv[])
+int main(int, char *[])
 {
 	spdlog::stdout_color_mt("main");
 	spdlog::set_pattern("[%Y-%m-%d %H:%M:%S] [%n] [%t] [%l] %v");
-	spdlog::set_level(spdlog::level::trace);
+	spdlog::set_level(spdlog::level::info);
 	blockgo::websocket_server game;
 	try
 	{

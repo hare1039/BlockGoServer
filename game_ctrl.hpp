@@ -28,12 +28,13 @@ class game_ctrl
 {
 	std::unique_ptr<bp::child> handler;
 
-	bp::async_pipe ipipe, opipe;
-	boost::asio::streambuf read_buf;
-	std::queue<std::string> write_msg_queue;
 	// ref to parent websocket server to send async message
 	websocket_server_base & ws;
 	websocketpp::connection_hdl hdl;
+
+	bp::async_pipe ipipe, opipe;
+	boost::asio::streambuf read_buf;
+	std::queue<std::string> write_msg_queue;
 public:
 	game_ctrl(websocket_server_base & wsp,
 	          websocketpp::connection_hdl h,
@@ -45,7 +46,6 @@ public:
 		spdlog::get("game_ctrl")->trace("hdl: {}", hdl.lock().get());
 		handler.reset(
 			new bp::child{"./ai-project/BlockGo/BlockGoStatic", "web",
-//			new bp::child{"/bin/cat", "-",
 					       bp::std_out > ipipe,
        	                   bp::std_in  < opipe,
 //	                       bp::std_err > bp::null
@@ -56,7 +56,6 @@ public:
 
 	~game_ctrl()
 	{
-		spdlog::get("game_ctrl")->trace("deconstructing");
 		handler->terminate();
 	}
 
@@ -92,9 +91,13 @@ private:
 					ws.send(hdl, line);
 					launch_read_pipe();
 				}
+				else if (error == boost::asio::error::eof)
+				{
+					spdlog::get("game_ctrl")->info("read EOF. Closing...");
+				}
 				else
 				{
-					spdlog::get("game_ctrl")->error("write read err: {}", error.message());
+					spdlog::get("game_ctrl")->error("read err: {}", error.message());
 				}
 			}
 	    );
