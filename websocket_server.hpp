@@ -38,8 +38,7 @@ public:
 		server.set_open_handler    ([this](websocketpp::connection_hdl hdl){this->on_open(hdl);});
 		server.set_fail_handler    ([this](websocketpp::connection_hdl hdl){this->on_fail(hdl);});
 		server.set_close_handler   ([this](websocketpp::connection_hdl hdl){this->on_close(hdl);});
-
-		server.set_access_channels(websocketpp::log::alevel::none);
+		server.set_access_channels(websocketpp::log::alevel::all);
 	}
 	void run(int on_port)
 	{
@@ -76,9 +75,13 @@ private:
 		spdlog::get("websocket")->error("Connection failed: {}", hdl.lock().get());
         game.erase(hdl);
         spdlog::get("websocket")->error("joining thread: {}", hdl.lock().get());
-        game_pool[hdl]->join();
-        game_pool.erase(hdl);
-        game_attrbute.erase(hdl);
+
+		if (game_pool.find(hdl) != game_pool.end())
+		{
+			game_pool[hdl]->join();
+			game_pool.erase(hdl);
+		}
+		game_attrbute.erase(hdl);
 	}
 	void on_close (websocketpp::connection_hdl hdl)
 	{
@@ -93,6 +96,7 @@ private:
 	{
 		try
 		{
+		    spdlog::get("websocket")->trace("get msg: {}", msg->get_payload());
 			auto command = nlohmann::json::parse(msg->get_payload());
 			ask_block_go(hdl, command);
 		}
@@ -183,26 +187,26 @@ private:
 		spdlog::get("websocket")->debug("{}", json.dump(4));
 		try
 		{
-			switch (hash(json["cmd"].get<std::string>().c_str()))
+			switch (hash(json.at("cmd").get<std::string>().c_str()))
 			{
 			case "start"_:
 			{
-				if      (json["left"] == "MCTS"  && json["right"] == "human")
+				if      (json.at("left") == "MCTS"  && json.at("right") == "human")
 					blockgo.send_stdin("4");
-				else if (json["left"] == "human" && json["right"] == "MCTS")
+				else if (json.at("left") == "human" && json.at("right") == "MCTS")
 					blockgo.send_stdin("3");
-				else if (json["left"] == "MCTS"  && json["right"] == "MCTS")
+				else if (json.at("left") == "MCTS"  && json.at("right") == "MCTS")
 					blockgo.send_stdin("2");
-				else if (json["left"] == "human" && json["right"] == "human")
+				else if (json.at("left") == "human" && json.at("right") == "human")
 					blockgo.send_stdin("1");
 				break;
 			}
 			case "transfer"_:
 			{
-				int x      = json["x"];
-				int y      = json["y"];
-				int type   = json["stone"];
-				int rotate = json["rotate"];
+				int x      = json.at("x");
+				int y      = json.at("y");
+				int type   = json.at("stone");
+				int rotate = json.at("rotate");
 				std::stringstream command;
 
 				// converting json commands to fed into BlockGo
@@ -221,7 +225,7 @@ private:
 				break;
 
 			case "debug"_:
-				blockgo.send_stdin(json["data"]);
+				blockgo.send_stdin(json.at("data"));
 				break;
 
 			default:

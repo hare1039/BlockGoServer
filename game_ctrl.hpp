@@ -6,6 +6,7 @@
 #include <iostream>
 #include <sstream>
 #include <queue>
+#include <mutex>
 
 #include <spdlog/spdlog.h>
 #include <boost/process.hpp>
@@ -35,6 +36,7 @@ class game_ctrl
 	bp::async_pipe ipipe, opipe;
 	boost::asio::streambuf read_buf;
 	std::queue<std::string> write_msg_queue;
+    std::mutex write_msg_queue_mtx;
 public:
 	game_ctrl(websocket_server_base & wsp,
 	          websocketpp::connection_hdl h,
@@ -46,10 +48,10 @@ public:
 		spdlog::get("game_ctrl")->trace("hdl: {}", hdl.lock().get());
 		handler.reset(
 			new bp::child{"./ai-project/BlockGo/BlockGoStatic", "web",
-					       bp::std_out > ipipe,
+						   bp::std_out > bp::null,
+//					       bp::std_out > stderr,
        	                   bp::std_in  < opipe,
-	                       bp::std_err > bp::null
-//	                       bp::std_err > stderr
+	                       bp::std_err > ipipe
 	    });
 		launch_read_pipe();
 	}
@@ -62,10 +64,13 @@ public:
 	void send_stdin(std::string const &s)
 	{
 		spdlog::get("game_ctrl")->trace("sending: {}", s);
-		if (s.back() != '\n')
-			write_msg_queue.push(s + "\n");
-		else
-			write_msg_queue.push(s);
+		{
+		    std::lock_guard<std::mutex> guard(write_msg_queue_mtx);
+		    if (s.back() != '\n')
+			    write_msg_queue.push(s + "\n");
+		    else
+			    write_msg_queue.push(s);
+		}
 		launch_write_pipe();
 		spdlog::get("game_ctrl")->trace("launched: {}", s);
 	}
@@ -112,10 +117,14 @@ private:
 			{
 				if (not error)
 				{
+				    {
+					std::lock_guard<std::mutex> guard(write_msg_queue_mtx);
 					spdlog::get("game_ctrl")->debug("wrote pipe: {}", write_msg_queue.front());
 					write_msg_queue.pop();
-					if (not write_msg_queue.empty())
-						launch_write_pipe();
+				    }
+				    
+				    if (not write_msg_queue.empty())
+					launch_write_pipe();
 				}
 				else
 				{

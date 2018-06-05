@@ -16,7 +16,7 @@ int main(int, char *[])
 {
 	spdlog::stdout_color_mt("main");
 	spdlog::set_pattern("[%Y-%m-%d %H:%M:%S] [%n] [%t] [%l] %v");
-	spdlog::set_level(spdlog::level::info);
+	spdlog::set_level(spdlog::level::trace);
 	blockgo::websocket_server game;
 	try
 	{
