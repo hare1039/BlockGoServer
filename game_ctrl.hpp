@@ -16,7 +16,7 @@
 namespace blockgo
 {
 
-
+namespace PLAYER_TYPE {enum player_type { NONE, HUMAN, MCTS };}
 namespace bp = boost::process;
 class websocket_server_base
 {
@@ -48,8 +48,8 @@ public:
 		spdlog::get("game_ctrl")->trace("hdl: {}", hdl.lock().get());
 		handler.reset(
 			new bp::child{"./ai-project/BlockGo/BlockGoStatic", "web",
-						   bp::std_out > bp::null,
-//					       bp::std_out > stderr,
+//						   bp::std_out > bp::null,
+					       bp::std_out > stderr,
        	                   bp::std_in  < opipe,
 	                       bp::std_err > ipipe
 	    });
@@ -63,7 +63,7 @@ public:
 
 	void send_stdin(std::string const &s)
 	{
-		spdlog::get("game_ctrl")->trace("sending: {}", s);
+		spdlog::get("game_ctrl")->trace("queueing: {}", s);
 		{
 		    std::lock_guard<std::mutex> guard(write_msg_queue_mtx);
 		    if (s.back() != '\n')

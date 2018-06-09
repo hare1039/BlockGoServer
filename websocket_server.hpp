@@ -123,48 +123,58 @@ private:
 				{"why", ""}
 			}).dump(), websocketpp::frame::opcode::text);
 		}
-		else if (s == "P1 win" || s == "P2 win" || s == "DRAW")
-		{
-			server.send(hdl, (nlohmann::json{
-				{"cmd", "status"},
-				{"status", "end"},
-				{"why", s}
-			}).dump(), websocketpp::frame::opcode::text);
-			return;
-		}
-
 
 		try
 		{
 			auto res = nlohmann::json::parse(s);
-			res["cmd"]    = "transfer";
-			res["x"]      = res["x"].get<int>() - 1;
-			res["y"]      = res["y"].get<int>() - 1;
-			res["rotate"] = (res["rotate"].get<int>() + 3) % 4;
-			server.send(hdl, res.dump(), websocketpp::frame::opcode::text);
+			if (res.find("winner") != res.end())
+			{
+				server.send(hdl, (nlohmann::json{
+					{"cmd", "status"},
+					{"status", "end"},
+					{"why", s}
+				}).dump(), websocketpp::frame::opcode::text);
+			}
+			else
+			{
+				// adjust coordinate from BlockGo to web
+				int x = res.at("x").get<int>() - 1;
+				int y = res.at("y").get<int>() - 1;
+				int rotate = (res.at("rotate").get<int>() + 3) % 4;
+				res["cmd"]       = "transfer";
+				res.at("x")      = x;
+				res.at("y")      = y;
+				res.at("rotate") = rotate;
+				res["player"]    = nlohmann::json({
+					{"current", game_attrbute.at(hdl).at("player").at("next")},
+					{"next", PLAYER_TYPE::NONE},
+				});
+
+				server.send(hdl, res.dump(), websocketpp::frame::opcode::text);
+			}
 		}
 		catch (nlohmann::json::parse_error const &e)
 		{
-			server.send(hdl, (nlohmann::json{
-				{"cmd", "status"},
-				{"status", "err"},
-				{"why", s},
-				{"origin", game_attrbute[hdl]}
-			}).dump(), websocketpp::frame::opcode::text);
-
+			spdlog::get("websocket")->debug("trying to revert map");
 			// try revert to (1, 1)
-			if (game_attrbute[hdl].count("stone") != 0)
+			if (game_attrbute[hdl].count("handled") == 0 || not game_attrbute[hdl].at("handled"))
 			{
-				spdlog::get("websocket")->debug("trying to revert map");
+				server.send(hdl, (nlohmann::json{
+					{"cmd", "status"},
+					{"status", "err"},
+					{"why", s},
+					{"origin", game_attrbute[hdl]}
+				}).dump(), websocketpp::frame::opcode::text);
+
 				int x      = game_attrbute[hdl]["x"];
 				int y      = game_attrbute[hdl]["y"];
 				int rotate = game_attrbute[hdl]["rotate"];
+				game_attrbute[hdl]["handled"] = true;
 				std::stringstream command;
 				std::fill_n(std::ostream_iterator<char>(command), 4 - rotate, 'c');
 				std::fill_n(std::ostream_iterator<char>(command), x, 'a');
 				std::fill_n(std::ostream_iterator<char>(command), y, 'w');
 				game[hdl]->send_stdin(command.str());
-				game_attrbute[hdl] = nlohmann::json{};
 			}
 		}
 		catch (nlohmann::json::exception const &e)
@@ -191,14 +201,6 @@ private:
 			{
 			case "start"_:
 			{
-				if      (json.at("left") == "MCTS"  && json.at("right") == "human")
-					blockgo.send_stdin("4");
-				else if (json.at("left") == "human" && json.at("right") == "MCTS")
-					blockgo.send_stdin("3");
-				else if (json.at("left") == "MCTS"  && json.at("right") == "MCTS")
-					blockgo.send_stdin("2");
-				else if (json.at("left") == "human" && json.at("right") == "human")
-					blockgo.send_stdin("1");
 				break;
 			}
 			case "transfer"_:
@@ -207,15 +209,19 @@ private:
 				int y      = json.at("y");
 				int type   = json.at("stone");
 				int rotate = json.at("rotate");
+				PLAYER_TYPE::player_type player = json.at("player").at("current");
 				std::stringstream command;
 
-				// converting json commands to fed into BlockGo
+				// converting json commands to feed into BlockGo
 
-				command << type;
+				spdlog::get("websocket")->trace("game attr: {}", game_attrbute[hdl].dump(4));				
+				command << player << type;
 				std::fill_n(std::ostream_iterator<char>(command), rotate, 'c');
 				std::fill_n(std::ostream_iterator<char>(command), x, 'd');
 				std::fill_n(std::ostream_iterator<char>(command), y, 's');
 				command << 'y';
+				if (json.at("player").at("next") != PLAYER_TYPE::HUMAN)
+					command << json.at("player").at("next");
 
 				blockgo.send_stdin(command.str());
 				break;
