@@ -7,6 +7,7 @@
 #include <sstream>
 #include <queue>
 #include <mutex>
+#include <memory>
 #include <cassert>
 
 #include <spdlog/spdlog.h>
@@ -26,7 +27,7 @@ public:
 	virtual void send(websocketpp::connection_hdl const &, std::string) = 0;
 };
 
-class game_ctrl
+class game_ctrl : public std::enable_shared_from_this<game_ctrl>
 {
 	std::unique_ptr<bp::child> handler;
 
@@ -57,12 +58,16 @@ public:
        	                   bp::std_in  < opipe,
 	                       bp::std_err > ipipe
 	    });
-		launch_read_pipe();
 	}
 
 	~game_ctrl()
 	{
 		handler->terminate();
+	}
+
+	void start_read()
+	{
+		launch_read_pipe();
 	}
 
 	void send_stdin(std::string const &s)
@@ -86,11 +91,12 @@ private:
 	{
 		spdlog::get("game_ctrl")->info("launch read pipe");
 		spdlog::get("game_ctrl")->trace("with hdl {}", hdl.lock().get());
+		auto self(shared_from_this());
 	    boost::asio::async_read_until(
 			this->ipipe,
 			read_buf,
 			'\n',
-			[this](boost::system::error_code const &error, std::size_t)
+			[this, self](boost::system::error_code const &error, std::size_t)
 			{
 				if (not error)
 				{
@@ -116,10 +122,11 @@ private:
 	void launch_write_pipe()
 	{
 		spdlog::get("game_ctrl")->debug("launch write pipe");
+		auto self(shared_from_this());
 		boost::asio::async_write(
 			this->opipe,
 			boost::asio::buffer(write_msg_queue.front()),
-			[this] (boost::system::error_code const &error, std::size_t)
+			[this, self] (boost::system::error_code const &error, std::size_t)
 			{
 				if (not error)
 				{
@@ -128,7 +135,7 @@ private:
 						spdlog::get("game_ctrl")->debug("wrote pipe: {}", write_msg_queue.front());
 						write_msg_queue.pop();
 				    }
-				    
+
 				    if (not write_msg_queue.empty())
 						launch_write_pipe();
 				}

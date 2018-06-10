@@ -49,7 +49,7 @@ public:
 private:
 	websocketpp::server<websocketpp::config::asio> server;
 	std::map<websocketpp::connection_hdl,
-	         std::unique_ptr<blockgo::game_ctrl>,
+	         std::shared_ptr<blockgo::game_ctrl>,
 	         std::owner_less<websocketpp::connection_hdl>> game;
 
 	std::map<websocketpp::connection_hdl,
@@ -65,9 +65,12 @@ private:
 		spdlog::get("websocket")->info("Opening connection: {}", hdl.lock().get());
 		auto io = std::make_unique<boost::asio::io_service>();
 		spdlog::get("websocket")->trace("game.emplace");
-		game.emplace(hdl, new blockgo::game_ctrl(*this, hdl, *io));
+		auto game_ptr = std::make_shared<game_ctrl>(*this, hdl, *io);
+		game.emplace(hdl, game_ptr->shared_from_this());
+		game_ptr->start_read();
 		spdlog::get("websocket")->trace("game_pool.emplace");
 		game_pool.emplace(hdl, new std::thread{[io = std::move(io)]{io->run();}});
+		game_pool.at(hdl)->detach();
 		game_attrbute[hdl] = nlohmann::json{};
 	}
 	void on_fail  (websocketpp::connection_hdl hdl)
@@ -87,8 +90,6 @@ private:
 	{
 		spdlog::get("websocket")->info("Closing connection: {}", hdl.lock().get());
         game.erase(hdl);
-        spdlog::get("websocket")->trace("joining thread: {}", hdl.lock().get());
-        game_pool[hdl]->join();
         game_pool.erase(hdl);
         game_attrbute.erase(hdl);
 	}
