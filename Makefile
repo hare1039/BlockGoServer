@@ -5,14 +5,15 @@ DOCKER_ENV  = docker run --rm -v ${PWD}:/work -p 9002:9002 alpine
 DOCKER_ENV_DBG = docker run --rm -v ${PWD}:/work -it --net=host --security-opt seccomp=unconfined --cap-add=SYS_PTRACE hare1039/ubuntu-gdb
 DOCKER_MAKE = docker run --rm -v ${PWD}:/work hare1039/alpinemake
 CXXFLAGS    = -Wall -Wextra
-
+RELEASE_FLAGS = -O3 -DNDEBUG
+DEBUG_FLAGS = -O0 -g
 
 app: main.cpp game_ctrl.hpp websocket_server.hpp
-	$(CXX) -o $(TARGET) $(CXXFLAGS) $<
+	$(CXX) -o $(TARGET) $(CXXFLAGS) $(RELEASE_FLAGS) $<
 
 .PHONY: debug
 debug: main.cpp game_ctrl.hpp websocket_server.hpp
-	$(CXX) -o $(TARGET) $(CXXFLAGS) -g $<
+	$(CXX) -o $(TARGET) $(CXXFLAGS) $(DEBUG_FLAGS) $<
 
 .PHONY: main
 main:
@@ -23,7 +24,7 @@ run: app main
 	$(DOCKER_ENV) sh -c 'cd /work && ./app'
 
 .PHONY: run-
-run-: app main
+run-: debug main
 	$(DOCKER_ENV_DBG) sh -c 'cd /work && gdb app'
 
 .PHONY: rebuild

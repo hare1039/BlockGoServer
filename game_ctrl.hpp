@@ -7,6 +7,7 @@
 #include <sstream>
 #include <queue>
 #include <mutex>
+#include <cassert>
 
 #include <spdlog/spdlog.h>
 #include <boost/process.hpp>
@@ -48,8 +49,11 @@ public:
 		spdlog::get("game_ctrl")->trace("hdl: {}", hdl.lock().get());
 		handler.reset(
 			new bp::child{"./ai-project/BlockGo/BlockGoStatic", "web",
-//						   bp::std_out > bp::null,
+#ifdef NDEBUG
+                           bp::std_out > bp::null,
+#else
 					       bp::std_out > stderr,
+#endif
        	                   bp::std_in  < opipe,
 	                       bp::std_err > ipipe
 	    });
@@ -64,6 +68,7 @@ public:
 	void send_stdin(std::string const &s)
 	{
 		spdlog::get("game_ctrl")->trace("queueing: {}", s);
+		bool write_in_progress = not write_msg_queue.empty();
 		{
 		    std::lock_guard<std::mutex> guard(write_msg_queue_mtx);
 		    if (s.back() != '\n')
@@ -71,7 +76,8 @@ public:
 		    else
 			    write_msg_queue.push(s);
 		}
-		launch_write_pipe();
+		if (not write_in_progress)
+			launch_write_pipe();
 		spdlog::get("game_ctrl")->trace("launched: {}", s);
 	}
 
@@ -118,13 +124,13 @@ private:
 				if (not error)
 				{
 				    {
-					std::lock_guard<std::mutex> guard(write_msg_queue_mtx);
-					spdlog::get("game_ctrl")->debug("wrote pipe: {}", write_msg_queue.front());
-					write_msg_queue.pop();
+						std::lock_guard<std::mutex> guard(write_msg_queue_mtx);
+						spdlog::get("game_ctrl")->debug("wrote pipe: {}", write_msg_queue.front());
+						write_msg_queue.pop();
 				    }
 				    
 				    if (not write_msg_queue.empty())
-					launch_write_pipe();
+						launch_write_pipe();
 				}
 				else
 				{
