@@ -70,6 +70,11 @@ public:
 		launch_read_pipe();
 	}
 
+	void stop()
+	{
+		handler->terminate();
+	}
+
 	void send_stdin(std::string const &s)
 	{
 		spdlog::get("game_ctrl")->trace("queueing: {}", s);
@@ -106,7 +111,7 @@ private:
 					spdlog::get("game_ctrl")->debug("async read pipe and send: {}", line);
 					spdlog::get("game_ctrl")->trace("hdl: {}", hdl.lock().get());
 					ws.send(hdl, line);
-					launch_read_pipe();
+				    launch_read_pipe();
 				}
 				else if (error == boost::asio::error::eof)
 				{

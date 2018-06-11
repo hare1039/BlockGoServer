@@ -76,19 +76,15 @@ private:
 	void on_fail  (websocketpp::connection_hdl hdl)
 	{
 		spdlog::get("websocket")->error("Connection failed: {}", hdl.lock().get());
+		game.at(hdl)->stop();
         game.erase(hdl);
-        spdlog::get("websocket")->error("joining thread: {}", hdl.lock().get());
-
-		if (game_pool.find(hdl) != game_pool.end())
-		{
-			game_pool[hdl]->join();
-			game_pool.erase(hdl);
-		}
+		game_pool.erase(hdl);
 		game_attrbute.erase(hdl);
 	}
 	void on_close (websocketpp::connection_hdl hdl)
 	{
 		spdlog::get("websocket")->info("Closing connection: {}", hdl.lock().get());
+		game.at(hdl)->stop();
         game.erase(hdl);
         game_pool.erase(hdl);
         game_attrbute.erase(hdl);
@@ -152,13 +148,14 @@ private:
 				});
 
 				server.send(hdl, res.dump(), websocketpp::frame::opcode::text);
+				spdlog::get("websocket")->trace("sent: {}", s);
 			}
 		}
 		catch (nlohmann::json::parse_error const &e)
 		{
 			spdlog::get("websocket")->debug("trying to revert map");
 			// try revert to (1, 1)
-			if (game_attrbute[hdl].count("handled") == 0 || not game_attrbute[hdl].at("handled"))
+			if (game_attrbute.at(hdl).count("handled") == 0 || not game_attrbute.at(hdl).at("handled"))
 			{
 				server.send(hdl, (nlohmann::json{
 					{"cmd", "status"},
@@ -188,7 +185,10 @@ private:
                 {"why", "unexpect json error: "s + e.what()}
             }).dump(), websocketpp::frame::opcode::text);
 		}
-		spdlog::get("websocket")->trace("sent: {}", s);
+		catch (std::out_of_range const &e)
+		{
+			spdlog::get("websocket")->error("hdl {} have gone. skipping.", hdl.lock().get());
+		}
 	}
 
 	void ask_block_go(websocketpp::connection_hdl const &hdl, nlohmann::json const & json)
