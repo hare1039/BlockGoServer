@@ -63,6 +63,7 @@ public:
 	~game_ctrl()
 	{
 		handler->terminate();
+		handler->wait();
 	}
 
 	void start_read()

@@ -28,6 +28,31 @@ long long int operator "" _(char const* p, size_t)
 
 class websocket_server: public websocket_server_base
 {
+	struct game_attrbute : public std::enable_shared_from_this<game_attrbute>
+	{
+		std::unique_ptr<boost::asio::io_service> io;
+		std::shared_ptr<blockgo::game_ctrl>      game_ptr;
+		std::thread                              io_thread;
+		nlohmann::json                           json;
+
+		game_attrbute(websocket_server & ws, websocketpp::connection_hdl hdl):
+			io{new boost::asio::io_service},
+			game_ptr{new blockgo::game_ctrl{ws, hdl, *io}},
+			json{}
+		{
+			spdlog::get("websocket")->trace("game_attrbute construct");
+		    game_ptr->start_read();
+			auto ptr = game_ptr->shared_from_this();
+			io_thread = std::thread([io = std::move(io), ptr]{io->run();});
+			io_thread.detach();
+		}
+
+		~game_attrbute()
+		{
+			game_ptr->stop();
+		}
+	};
+
 public:
 	websocket_server()
 	{
@@ -50,46 +75,25 @@ public:
 	}
 private:
 	websocketpp::server<websocketpp::config::asio> server;
-	std::map<websocketpp::connection_hdl,
-	         std::shared_ptr<blockgo::game_ctrl>,
-	         std::owner_less<websocketpp::connection_hdl>> game;
 
 	std::map<websocketpp::connection_hdl,
-	         std::unique_ptr<std::thread>,
-	         std::owner_less<websocketpp::connection_hdl>> game_pool;
-
-	std::map<websocketpp::connection_hdl,
-             nlohmann::json,
-             std::owner_less<websocketpp::connection_hdl>> game_attrbute;
+			 std::shared_ptr<game_attrbute>,
+			 std::owner_less<websocketpp::connection_hdl>> game;
 
 	void on_open  (websocketpp::connection_hdl hdl)
 	{
 		spdlog::get("websocket")->info("Opening connection: {}", hdl.lock().get());
-		auto io = std::make_unique<boost::asio::io_service>();
-		spdlog::get("websocket")->trace("game.emplace");
-		auto game_ptr = std::make_shared<game_ctrl>(*this, hdl, *io);
-		game.emplace(hdl, game_ptr->shared_from_this());
-		game_ptr->start_read();
-		spdlog::get("websocket")->trace("game_pool.emplace");
-		game_pool.emplace(hdl, new std::thread{[io = std::move(io)]{io->run();}});
-		game_pool.at(hdl)->detach();
-		game_attrbute[hdl] = nlohmann::json{};
+		game.emplace(hdl, new game_attrbute{*this, hdl});
 	}
 	void on_fail  (websocketpp::connection_hdl hdl)
 	{
 		spdlog::get("websocket")->error("Connection failed: {}", hdl.lock().get());
-		game.at(hdl)->stop();
         game.erase(hdl);
-		game_pool.erase(hdl);
-		game_attrbute.erase(hdl);
 	}
 	void on_close (websocketpp::connection_hdl hdl)
 	{
 		spdlog::get("websocket")->info("Closing connection: {}", hdl.lock().get());
-		game.at(hdl)->stop();
         game.erase(hdl);
-        game_pool.erase(hdl);
-        game_attrbute.erase(hdl);
 	}
 	void on_message (websocketpp::connection_hdl hdl, decltype(server)::message_ptr msg)
 	{
@@ -155,7 +159,7 @@ private:
 				res.at("y")      = y;
 				res.at("rotate") = rotate;
 				res["player"]    = nlohmann::json({
-					{"current", game_attrbute.at(hdl).at("player").at("next")},
+					{"current", game.at(hdl)->json.at("player").at("next")},
 					{"next", PLAYER_TYPE::NONE},
 				});
 
@@ -167,24 +171,24 @@ private:
 		{
 			spdlog::get("websocket")->debug("trying to revert map");
 			// try revert to (1, 1)
-			if (game_attrbute.at(hdl).count("handled") == 0 || not game_attrbute.at(hdl).at("handled"))
+			if (game.at(hdl)->json.count("handled") == 0 || not game.at(hdl)->json.at("handled"))
 			{
 				server.send(hdl, (nlohmann::json{
 					{"cmd", "status"},
 					{"status", "err"},
 					{"why", s},
-					{"origin", game_attrbute.at(hdl)}
+					{"origin", game.at(hdl)->json}
 				}).dump(), websocketpp::frame::opcode::text);
 
-				int x      = game_attrbute[hdl]["x"];
-				int y      = game_attrbute[hdl]["y"];
-				int rotate = game_attrbute[hdl]["rotate"];
-				game_attrbute[hdl]["handled"] = true;
+				int x      = game.at(hdl)->json["x"];
+				int y      = game.at(hdl)->json["y"];
+				int rotate = game.at(hdl)->json["rotate"];
+				game.at(hdl)->json["handled"] = true;
 				std::stringstream command;
 				std::fill_n(std::ostream_iterator<char>(command), 4 - rotate, 'c');
 				std::fill_n(std::ostream_iterator<char>(command), x, 'a');
 				std::fill_n(std::ostream_iterator<char>(command), y, 'w');
-				game[hdl]->send_stdin(command.str());
+				game.at(hdl)->game_ptr->send_stdin(command.str());
 			}
 		}
 		catch (nlohmann::json::exception const &e)
@@ -205,8 +209,8 @@ private:
 
 	void ask_block_go(websocketpp::connection_hdl const &hdl, nlohmann::json const & json)
 	{
-		blockgo::game_ctrl &blockgo = *game[hdl];
-		game_attrbute[hdl] = json;
+		blockgo::game_ctrl &blockgo = *(game.at(hdl)->game_ptr);
+		game.at(hdl)->json = json;
 		spdlog::get("websocket")->debug("{}", json.dump(4));
 		try
 		{
@@ -218,7 +222,7 @@ private:
 				if (start_player != PLAYER_TYPE::HUMAN)
 				{
 					blockgo.send_stdin(std::to_string(start_player));
-					game_attrbute.at(hdl)["player"] = nlohmann::json({
+					game.at(hdl)->json["player"] = nlohmann::json({
 						{"current", start_player},
 						{"next", PLAYER_TYPE::NONE},
 					});
@@ -237,7 +241,7 @@ private:
 
 				// converting json commands to feed into BlockGo
 
-				spdlog::get("websocket")->trace("game attr: {}", game_attrbute[hdl].dump(4));
+				spdlog::get("websocket")->trace("game attr: {}", game.at(hdl)->json.dump(4));
 				if (player == PLAYER_TYPE::HUMAN)
 				{
 					command << player << type;
