@@ -38,7 +38,9 @@ public:
 		server.set_open_handler    ([this](websocketpp::connection_hdl hdl){this->on_open(hdl);});
 		server.set_fail_handler    ([this](websocketpp::connection_hdl hdl){this->on_fail(hdl);});
 		server.set_close_handler   ([this](websocketpp::connection_hdl hdl){this->on_close(hdl);});
+#ifndef NDEBUG
 		server.set_access_channels(websocketpp::log::alevel::all);
+#endif
 	}
 	void run(int on_port)
 	{
@@ -93,7 +95,7 @@ private:
 	{
 		try
 		{
-		    spdlog::get("websocket")->trace("get msg: {}", msg->get_payload());
+		    spdlog::get("websocket")->info("get msg: {}", msg->get_payload());
 			auto command = nlohmann::json::parse(msg->get_payload());
 			ask_block_go(hdl, command);
 		}
@@ -119,6 +121,16 @@ private:
 				{"status", "ok"},
 				{"why", ""}
 			}).dump(), websocketpp::frame::opcode::text);
+			return;
+		}
+		else if (s == "eof")
+		{
+			server.send(hdl, (nlohmann::json{
+                {"cmd", "status"},
+                {"status", "err"},
+                {"why", "Game process terminated."}
+            }).dump(), websocketpp::frame::opcode::text);
+			return;
 		}
 
 		try
@@ -161,7 +173,7 @@ private:
 					{"cmd", "status"},
 					{"status", "err"},
 					{"why", s},
-					{"origin", game_attrbute[hdl]}
+					{"origin", game_attrbute.at(hdl)}
 				}).dump(), websocketpp::frame::opcode::text);
 
 				int x      = game_attrbute[hdl]["x"];
@@ -202,6 +214,16 @@ private:
 			{
 			case "start"_:
 			{
+				auto start_player = json.at("left").get<int>();
+				if (start_player != PLAYER_TYPE::HUMAN)
+				{
+					blockgo.send_stdin(std::to_string(start_player));
+					game_attrbute.at(hdl)["player"] = nlohmann::json({
+						{"current", start_player},
+						{"next", PLAYER_TYPE::NONE},
+					});
+				}
+
 				break;
 			}
 			case "transfer"_:
@@ -215,14 +237,21 @@ private:
 
 				// converting json commands to feed into BlockGo
 
-				spdlog::get("websocket")->trace("game attr: {}", game_attrbute[hdl].dump(4));				
-				command << player << type;
-				std::fill_n(std::ostream_iterator<char>(command), rotate, 'c');
-				std::fill_n(std::ostream_iterator<char>(command), x, 'd');
-				std::fill_n(std::ostream_iterator<char>(command), y, 's');
-				command << 'y';
-				if (json.at("player").at("next") != PLAYER_TYPE::HUMAN)
-					command << json.at("player").at("next");
+				spdlog::get("websocket")->trace("game attr: {}", game_attrbute[hdl].dump(4));
+				if (player == PLAYER_TYPE::HUMAN)
+				{
+					command << player << type;
+					std::fill_n(std::ostream_iterator<char>(command), rotate, 'c');
+					std::fill_n(std::ostream_iterator<char>(command), x, 'd');
+					std::fill_n(std::ostream_iterator<char>(command), y, 's');
+					command << 'y';
+					if (json.at("player").at("next") != PLAYER_TYPE::HUMAN)
+						command << json.at("player").at("next");
+				}
+				else
+				{
+					command << json.at("player").at("current");
+				}
 
 				blockgo.send_stdin(command.str());
 				break;
