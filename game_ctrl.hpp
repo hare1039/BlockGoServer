@@ -30,6 +30,8 @@ public:
 class game_ctrl : public std::enable_shared_from_this<game_ctrl>
 {
 	std::unique_ptr<bp::child> handler;
+	boost::asio::io_service io;
+	std::thread io_thread;
 
 	// ref to parent websocket server to send async message
 	websocket_server_base & ws;
@@ -41,8 +43,11 @@ class game_ctrl : public std::enable_shared_from_this<game_ctrl>
     std::mutex write_msg_queue_mtx;
 public:
 	game_ctrl(websocket_server_base & wsp,
-	          websocketpp::connection_hdl h,
-	          boost::asio::io_service & io): ws(wsp), hdl(h), ipipe(io), opipe(io)
+	          websocketpp::connection_hdl h):
+		ws{wsp},
+		hdl{h},
+		ipipe{io},
+		opipe{io}
 	{
 		if (not spdlog::get("game_ctrl") /* found */)
 			spdlog::stdout_color_mt("game_ctrl");
@@ -69,6 +74,9 @@ public:
 	void start_read()
 	{
 		launch_read_pipe();
+		auto self{shared_from_this()};
+		io_thread = std::thread{[this, self]{io.run();}};
+		io_thread.detach();
 	}
 
 	void stop()

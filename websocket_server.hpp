@@ -30,21 +30,15 @@ class websocket_server: public websocket_server_base
 {
 	struct game_attrbute : public std::enable_shared_from_this<game_attrbute>
 	{
-		std::unique_ptr<boost::asio::io_service> io;
-		std::shared_ptr<blockgo::game_ctrl>      game_ptr;
-		std::thread                              io_thread;
-		nlohmann::json                           json;
+		std::shared_ptr<blockgo::game_ctrl> game_ptr;
+		nlohmann::json                      json;
 
 		game_attrbute(websocket_server & ws, websocketpp::connection_hdl hdl):
-			io{new boost::asio::io_service},
-			game_ptr{new blockgo::game_ctrl{ws, hdl, *io}},
+			game_ptr{new blockgo::game_ctrl{ws, hdl}},
 			json{}
 		{
 			spdlog::get("websocket")->trace("game_attrbute construct");
 		    game_ptr->start_read();
-			auto ptr = game_ptr->shared_from_this();
-			io_thread = std::thread([io = std::move(io), ptr]{io->run();});
-			io_thread.detach();
 		}
 
 		~game_attrbute()
