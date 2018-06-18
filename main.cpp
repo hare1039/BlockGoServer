@@ -12,7 +12,7 @@
 #include <json.hpp>
 
 #include "websocket_server.hpp"
-int main(int, char *[])
+int main(int argc, char *argv[])
 {
 	spdlog::stdout_color_mt("main");
 	spdlog::set_pattern("[%Y-%m-%d %H:%M:%S] [%n] [%t] [%l] %v");
@@ -24,8 +24,11 @@ int main(int, char *[])
 	blockgo::websocket_server game;
 	try
 	{
-		spdlog::get("main")->info("Server started at :9002");
-		game.run(9002);
+		int port = 9002;
+		if (argc == 2)
+			port = std::stoi(argv[1]);
+		spdlog::get("main")->info("Server started at :" + std::to_string(port));
+		game.run(port);
 	}
 	catch (websocketpp::exception const & e)
 	{
