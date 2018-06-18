@@ -10,9 +10,9 @@
 #include <memory>
 #include <cassert>
 
-#include <spdlog/spdlog.h>
 #include <boost/process.hpp>
 
+#include "enable_spdlog.hpp"
 #include "websocket_server.hpp"
 
 namespace blockgo
@@ -28,6 +28,7 @@ public:
 };
 
 class game_ctrl : public std::enable_shared_from_this<game_ctrl>
+	            , public enable_spdlog<game_ctrl>
 {
 	std::unique_ptr<bp::child> handler;
 	boost::asio::io_service io;
@@ -49,10 +50,7 @@ public:
 		ipipe{io},
 		opipe{io}
 	{
-		if (not spdlog::get("game_ctrl") /* found */)
-			spdlog::stdout_color_mt("game_ctrl");
-
-		spdlog::get("game_ctrl")->trace("hdl: {}", hdl.lock().get());
+		spdlog()->trace("hdl: {}", hdl.lock().get());
 		handler.reset(
 			new bp::child{"./ai-project/BlockGo/BlockGoStatic", "web",
 #ifdef NDEBUG
@@ -86,7 +84,7 @@ public:
 
 	void send_stdin(std::string const &s)
 	{
-		spdlog::get("game_ctrl")->trace("queueing: {}", s);
+		spdlog()->trace("queueing: {}", s);
 		bool write_in_progress = not write_msg_queue.empty();
 		{
 		    std::lock_guard<std::mutex> guard(write_msg_queue_mtx);
@@ -97,14 +95,14 @@ public:
 		}
 		if (not write_in_progress)
 			launch_write_pipe();
-		spdlog::get("game_ctrl")->trace("launched: {}", s);
+		spdlog()->trace("launched: {}", s);
 	}
 
 private:
 	void launch_read_pipe()
 	{
-		spdlog::get("game_ctrl")->info("launch read pipe");
-		spdlog::get("game_ctrl")->trace("with hdl {}", hdl.lock().get());
+		spdlog()->info("launch read pipe");
+		spdlog()->trace("with hdl {}", hdl.lock().get());
 		auto self(shared_from_this());
 	    boost::asio::async_read_until(
 			this->ipipe,
@@ -117,25 +115,25 @@ private:
 					std::istream is(&read_buf);
 					std::string line;
 					std::getline(is, line);
-					spdlog::get("game_ctrl")->debug("async read pipe and send: {}", line);
-					spdlog::get("game_ctrl")->trace("hdl: {}", hdl.lock().get());
+					spdlog()->debug("async read pipe and send: {}", line);
+					spdlog()->trace("hdl: {}", hdl.lock().get());
 					ws.send(hdl, line);
 				    launch_read_pipe();
 				}
 				else if (error == boost::asio::error::eof)
 				{
-					spdlog::get("game_ctrl")->info("read EOF. Closing...");
+					spdlog()->info("read EOF. Closing...");
 				}
 				else
 				{
-					spdlog::get("game_ctrl")->error("read err: {}", error.message());
+					spdlog()->error("read err: {}", error.message());
 				}
 			}
 	    );
 	}
 	void launch_write_pipe()
 	{
-		spdlog::get("game_ctrl")->debug("launch write pipe");
+		spdlog()->debug("launch write pipe");
 		auto self(shared_from_this());
 		boost::asio::async_write(
 			this->opipe,
@@ -146,7 +144,7 @@ private:
 				{
 				    {
 						std::lock_guard<std::mutex> guard(write_msg_queue_mtx);
-						spdlog::get("game_ctrl")->debug("wrote pipe: {}", write_msg_queue.front());
+						spdlog()->debug("wrote pipe: {}", write_msg_queue.front());
 						write_msg_queue.pop();
 				    }
 
@@ -155,7 +153,7 @@ private:
 				}
 				else
 				{
-					spdlog::get("game_ctrl")->error("write pipe err: {}", error.message());
+					spdlog()->error("write pipe err: {}", error.message());
 				}
 			}
 		);

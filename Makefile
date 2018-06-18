@@ -10,10 +10,10 @@ CXXFLAGS    = -Wall -Wextra
 RELEASE_FLAGS = -O3 -DNDEBUG
 DEBUG_FLAGS = -O0 -g
 
-app: main.cpp game_ctrl.hpp websocket_server.hpp
+app: main.cpp game_ctrl.hpp websocket_server.hpp enable_spdlog.hpp
 	$(CXX) -o $@ $(CXXFLAGS) $(RELEASE_FLAGS) $<
 
-debug: main.cpp game_ctrl.hpp websocket_server.hpp
+debug: main.cpp game_ctrl.hpp websocket_server.hpp enable_spdlog.hpp
 	$(CXX) -o $@ $(CXXFLAGS) $(DEBUG_FLAGS) $<
 
 .PHONY: main

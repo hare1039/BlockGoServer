@@ -9,6 +9,7 @@
 #include <websocketpp/config/asio_no_tls.hpp>
 #include <websocketpp/server.hpp>
 #include <spdlog/spdlog.h>
+#include "enable_spdlog.hpp"
 #include "game_ctrl.hpp"
 
 
@@ -27,6 +28,7 @@ long long int operator "" _(char const* p, size_t)
 }
 
 class websocket_server: public websocket_server_base
+					  , public enable_spdlog<websocket_server>
 {
 	struct game_attrbute : public std::enable_shared_from_this<game_attrbute>
 	{
@@ -37,7 +39,7 @@ class websocket_server: public websocket_server_base
 			game_ptr{new blockgo::game_ctrl{ws, hdl}},
 			json{}
 		{
-			spdlog::get("websocket")->trace("game_attrbute construct");
+			spdlog()->trace("game_attrbute construct");
 		    game_ptr->start_read();
 		}
 
@@ -57,7 +59,9 @@ public:
 		server.set_open_handler    ([this](websocketpp::connection_hdl hdl){this->on_open(hdl);});
 		server.set_fail_handler    ([this](websocketpp::connection_hdl hdl){this->on_fail(hdl);});
 		server.set_close_handler   ([this](websocketpp::connection_hdl hdl){this->on_close(hdl);});
-#ifndef NDEBUG
+#ifdef NDEBUG
+		server.set_access_channels(websocketpp::log::alevel::none);
+#else
 		server.set_access_channels(websocketpp::log::alevel::all);
 #endif
 	}
@@ -76,40 +80,40 @@ private:
 
 	void on_open  (websocketpp::connection_hdl hdl)
 	{
-		spdlog::get("websocket")->info("Opening connection: {}", hdl.lock().get());
+		spdlog()->info("Opening connection: {}", hdl.lock().get());
 		game.emplace(hdl, new game_attrbute{*this, hdl});
 	}
 	void on_fail  (websocketpp::connection_hdl hdl)
 	{
-		spdlog::get("websocket")->error("Connection failed: {}", hdl.lock().get());
+		spdlog()->error("Connection failed: {}", hdl.lock().get());
         game.erase(hdl);
 	}
 	void on_close (websocketpp::connection_hdl hdl)
 	{
-		spdlog::get("websocket")->info("Closing connection: {}", hdl.lock().get());
+		spdlog()->info("Closing connection: {}", hdl.lock().get());
         game.erase(hdl);
 	}
 	void on_message (websocketpp::connection_hdl hdl, decltype(server)::message_ptr msg)
 	{
 		try
 		{
-		    spdlog::get("websocket")->info("get msg: {}", msg->get_payload());
+		    spdlog()->info("get msg: {}", msg->get_payload());
 			auto command = nlohmann::json::parse(msg->get_payload());
 			ask_block_go(hdl, command);
 		}
 		catch (websocketpp::lib::error_code const &e)
 		{
-			spdlog::get("websocket")->error("on message failed because: {}", e.message());
+			spdlog()->error("on message failed because: {}", e.message());
 		}
 		catch (nlohmann::json::parse_error const &e)
 		{
-			spdlog::get("websocket")->error("on message failed because: {}", e.what());
+			spdlog()->error("on message failed because: {}", e.what());
 		}
 	}
 
 	void send(websocketpp::connection_hdl const &hdl, std::string s) override
 	{
-		spdlog::get("websocket")->trace("sending by hdl: {}", s);
+		spdlog()->trace("sending by hdl: {}", s);
 
 		// special strings
 		if (s == "")
@@ -158,12 +162,12 @@ private:
 				});
 
 				server.send(hdl, res.dump(), websocketpp::frame::opcode::text);
-				spdlog::get("websocket")->trace("sent: {}", s);
+				spdlog()->trace("sent: {}", s);
 			}
 		}
 		catch (nlohmann::json::parse_error const &e)
 		{
-			spdlog::get("websocket")->debug("trying to revert map");
+			spdlog()->debug("trying to revert map");
 			// try revert to (1, 1)
 			if (game.at(hdl)->json.count("handled") == 0 || not game.at(hdl)->json.at("handled"))
 			{
@@ -188,7 +192,7 @@ private:
 		catch (nlohmann::json::exception const &e)
 		{
 			using namespace std::literals;
-			spdlog::get("websocket")->error("json error: {}", e.what());
+			spdlog()->error("json error: {}", e.what());
             server.send(hdl, (nlohmann::json{
                 {"cmd", "status"},
                 {"status", "err"},
@@ -197,7 +201,7 @@ private:
 		}
 		catch (std::out_of_range const &e)
 		{
-			spdlog::get("websocket")->error("hdl {} have gone. skipping.", hdl.lock().get());
+			spdlog()->error("hdl {} have gone. skipping.", hdl.lock().get());
 		}
 	}
 
@@ -205,7 +209,7 @@ private:
 	{
 		blockgo::game_ctrl &blockgo = *(game.at(hdl)->game_ptr);
 		game.at(hdl)->json = json;
-		spdlog::get("websocket")->debug("{}", json.dump(4));
+		spdlog()->debug("{}", json.dump(4));
 		try
 		{
 			switch (hash(json.at("cmd").get<std::string>().c_str()))
@@ -235,7 +239,7 @@ private:
 
 				// converting json commands to feed into BlockGo
 
-				spdlog::get("websocket")->trace("game attr: {}", game.at(hdl)->json.dump(4));
+				spdlog()->trace("game attr: {}", game.at(hdl)->json.dump(4));
 				if (player == PLAYER_TYPE::HUMAN)
 				{
 					command << player << type;
@@ -263,13 +267,13 @@ private:
 				break;
 
 			default:
-				spdlog::get("websocket")->error("[parse cmd] AAAhhh... no one gets here!\n");
+				spdlog()->error("[parse cmd] AAAhhh... no one gets here!\n");
 				break;
 			}
 		}
 		catch (nlohmann::json::exception const &e)
 		{
-			spdlog::get("websocket")->error("json.cmd parse failed. What: {} \ne-id: {}\n", e.what(), e.id);
+			spdlog()->error("json.cmd parse failed. What: {} \ne-id: {}\n", e.what(), e.id);
 		}
 	}
 };
